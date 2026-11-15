@@ -78,10 +78,14 @@ def clump(data_frame: DataFrame) -> StudyLocus:
         f.col("p_value").cast(t.DoubleType())
         <= LocusBreakerClumpingConfig.lbc_baseline_pvalue
     )
+    significant = variant_ids.join(
+        f.broadcast(significant), on=["marker_name", "genome_build"], how="right"
+    )
+    missing = significant.filter(f.col("variantId").isNull())
+    if not missing.isEmpty():
+        raise ValueError(f"Missing from variant-ids: {missing.collect()}")
     study_locus = (
-        to_summary_statistics(
-            variant_ids.join(f.broadcast(significant), on=["marker_name", "genome_build"])
-        )
+        to_summary_statistics(significant)
         .locus_breaker_clumping()
         .exclude_region(
             GenomicRegion.from_known_genomic_region(KnownGenomicRegions.MHC)
@@ -100,7 +104,9 @@ def clump(data_frame: DataFrame) -> StudyLocus:
     )
     return study_locus.annotate_locus_statistics_boundaries(
         to_summary_statistics(
-            data_frame.join(f.broadcast(locus_variants), on=["marker_name", "genome_build"])
+            data_frame.join(
+                f.broadcast(locus_variants), on=["marker_name", "genome_build"]
+            )
         )
     )
 
