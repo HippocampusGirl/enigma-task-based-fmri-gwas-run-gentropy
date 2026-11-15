@@ -81,9 +81,14 @@ def clump(data_frame: DataFrame) -> StudyLocus:
     significant = variant_ids.join(
         f.broadcast(significant), on=["marker_name", "genome_build"], how="right"
     )
+
     missing = significant.filter(f.col("variantId").isNull())
-    if not missing.isEmpty():
-        raise ValueError(f"Missing from variant-ids: {missing.collect()}")
+    missing_count = missing.count()
+    if missing_count:
+        logger.warning(
+            f"Dropping {missing_count} variants without variantId"
+        )
+
     study_locus = (
         to_summary_statistics(significant)
         .locus_breaker_clumping()
